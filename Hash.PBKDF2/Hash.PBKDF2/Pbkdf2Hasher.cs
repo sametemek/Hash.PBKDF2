@@ -7,47 +7,44 @@ namespace Hash.PBKDF2
 {
     public interface IHasher
     {
-        string Hash(string salt, string word);
-        bool Validate(string salt, string word, string hash);
+        string Hash(string word, string salt = null);
+        bool Validate(string word, string salt, string hash);
     }
 
     public class Pbkdf2Hasher : IHasher
     {
-        private readonly int _saltByteSize;
+        private readonly int _defaultSaltByteSize;
         private readonly int _hashByteSize; // to match the size of the PBKDF2-HMAC-SHA-1 hash 
         private readonly int _pbkdf2Iterations;
 
-        public Pbkdf2Hasher(int pbkdf2Iterations = 1000)
+        public Pbkdf2Hasher(int pbkdf2Iterations = 1000, int hastByteSize = 20, int defaultDefaultSaltByteSize = 24)
         {
             this._pbkdf2Iterations = pbkdf2Iterations;
-            this._saltByteSize = 24;
-            this._hashByteSize = 20;
+            this._defaultSaltByteSize = defaultDefaultSaltByteSize;
+            this._hashByteSize = hastByteSize;
         }
 
-        public string Hash(string salt, string word)
+        public string Hash(string word, string salt)
         {
-            byte[] saltBytes;
-            if (salt == null)
-            {
-                var cryptoProvider = new RNGCryptoServiceProvider();
-                saltBytes = new byte[_saltByteSize];
-                cryptoProvider.GetBytes(saltBytes);
-            }
-            else
-            {
-                saltBytes = Encoding.ASCII.GetBytes(salt);
-            }
-
+            var saltBytes = salt == null ? GenerateSalt() : Encoding.ASCII.GetBytes(salt);
             var hash = GetPbkdf2Bytes(word, saltBytes, _pbkdf2Iterations, _hashByteSize);
             return Convert.ToBase64String(hash);
         }
 
-        public bool Validate(string salt, string word, string hash)
+        public bool Validate(string word, string salt, string hash)
         {
             var saltBytes = Encoding.ASCII.GetBytes(salt);
             var hashBytes = Convert.FromBase64String(hash);
             var testHash = GetPbkdf2Bytes(word, saltBytes, _pbkdf2Iterations, hashBytes.Length);
             return SlowEquals(hashBytes, testHash);
+        }
+
+        private byte[] GenerateSalt()
+        {
+            var cryptoProvider = new RNGCryptoServiceProvider();
+            var saltBytes = new byte[_defaultSaltByteSize];
+            cryptoProvider.GetBytes(saltBytes);
+            return saltBytes;
         }
 
         private bool SlowEquals(IReadOnlyList<byte> a, IReadOnlyList<byte> b)
